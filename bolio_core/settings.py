@@ -42,6 +42,8 @@ if 'RENDER' in os.environ:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    # Ensure connections from the app's own domain are allowed
+    ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -96,14 +98,25 @@ ASGI_APPLICATION = 'bolio_core.asgi.application'
 
 if 'REDIS_URL' in os.environ:
     redis_url = os.environ.get('REDIS_URL')
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels_redis.core.RedisChannelLayer',
-            'CONFIG': {
-                'hosts': [redis_url],
+    # Use robust configuration for Redis (especially for Upstash/SSL)
+    if redis_url.startswith('rediss://'):
+        CHANNEL_LAYERS = {
+            'default': {
+                'BACKEND': 'channels_redis.core.RedisChannelLayer',
+                'CONFIG': {
+                    'hosts': [{'address': redis_url, 'ssl_cert_reqs': None}],
+                },
             },
-        },
-    }
+        }
+    else:
+        CHANNEL_LAYERS = {
+            'default': {
+                'BACKEND': 'channels_redis.core.RedisChannelLayer',
+                'CONFIG': {
+                    'hosts': [redis_url],
+                },
+            },
+        }
 else:
     CHANNEL_LAYERS = {
         'default': {

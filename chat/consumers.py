@@ -1,7 +1,9 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-# Moved model imports inside methods to avoid startup issues
+from .models import Chat, Message, MessageReaction, Poll, PollOption, GroupRole, ScheduledCall
+from accounts.models import User
+# Rest of the methods will now have access to these models
 
 class NotificationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -474,9 +476,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def save_message(self, sender_id, chat_id, content, message_type='text', file_data=None, reply_to_id=None, unlock_at=None, is_view_once=False, is_protected=False, related_id=None):
-        from .models import Chat, Message
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
         sender = User.objects.get(id=sender_id)
         chat = Chat.objects.get(id=chat_id)
         reply_to = None
