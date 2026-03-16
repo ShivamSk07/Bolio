@@ -1,0 +1,33 @@
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.home, name='home'),
+    path('upload/', views.upload_file, name='upload_file'),
+    path('create-group/', views.create_group, name='create_group'),
+    path('generate-qr/<uuid:chat_id>/', views.generate_chat_qr, name='generate_chat_qr'),
+    path('join/<uuid:chat_id>/', views.join_chat, name='join_chat'),
+    path('update-profile/', views.update_profile, name='update_profile'),
+    path('user-info/<int:user_id>/', views.get_user_info, name='user_info'),
+    path('start-chat/', views.start_private_chat, name='start_chat'),
+    path('group-info/<uuid:chat_id>/', views.get_group_info, name='get_group_info'),
+    path('leave-group/<uuid:chat_id>/', views.leave_group, name='leave_group'),
+    path('delete-group/<uuid:chat_id>/', views.delete_group, name='delete_group'),
+    path('settings/', views.settings_view, name='settings'),
+    path('profile/<int:user_id>/', views.user_profile_view, name='user_profile'),
+    path('toggle-block/', views.toggle_block, name='toggle_block'),
+    path('respond-request/', views.respond_chat_request, name='respond_request'),
+    path('room/<str:room_code>/', views.room_view, name='room_view'),
+    path('add-call-log/', views.add_call_log, name='add_call_log'),
+    path('get-call-logs/', views.get_call_logs, name='get_call_logs'),
+    path('clear-call-logs/', views.clear_call_logs, name='clear_call_logs'),
+    path('create-story/', views.create_story, name='create_story'),
+    path('get-stories/', views.get_stories, name='get_stories'),
+    path('view-story/', views.view_story, name='view_story'),
+    path('delete-story/', views.delete_story, name='delete_story'),
+    # Room endpoints
+    path('create-room/', views.create_room, name='create_room'),
+    path('admit-user/', views.admit_user, name='admit_user'),
+    path('room-info/<str:room_code>/', views.get_room_info, name='room_info'),
+    path('finish-tour/', views.finish_tour, name='finish_tour'),
+]

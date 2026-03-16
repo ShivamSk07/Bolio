@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card glass">
+        <h1 class="logo-text">Bolio</h1>
+        <p style="text-align: center; color: var(--text-gray); margin-bottom: 30px;">Premium Messaging Experience</p>
+        
+        <form method="post">
+            {% csrf_token %}
+            <div class="input-group">
+                <label for="username">Username</label>
+                <input type="text" name="username" id="username" required placeholder="Enter your username">
+            </div>
+            
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" name="password" id="password" required placeholder="••••••••">
+            </div>
+            
+            <button type="submit" class="btn-primary">Sign In</button>
+        </form>
+        
+        <p style="text-align: center; margin-top: 20px; font-size: 0.875rem;">
+            Don't have an account? <a href="{% url 'signup' %}" style="color: var(--primary-color);">Sign Up</a>
+        </p>
+        
+        <div class="dev-credit" style="display: block; width: 100%; text-align:center; font-size:0.7rem; font-weight:800; color:var(--text-muted); opacity:0.8; margin-top:15px; padding-bottom: 20px;">
+            Developed by <a href="https://www.linkedin.com/in/shivam-kothekar/" target="_blank" style="color: var(--primary-color); text-decoration: none;">Shivam Kothekar</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+Django==5.2.9
+daphne
+channels
+channels-redis
+gunicorn
+whitenoise
+psycopg2-binary
+pillow
+qrcode
+python-dotenv
+google-genai
+groq
+uvicorn
+dj-database-url
