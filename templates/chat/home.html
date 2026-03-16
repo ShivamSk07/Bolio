@@ -1519,8 +1519,9 @@
         }
 
         .sidebar-bottom-nav {
-            padding-bottom: 24px;
-            /* Space for iPhone bottom bar */
+            padding-bottom: calc(14px + env(safe-area-inset-bottom));
+            margin-bottom: env(safe-area-inset-bottom);
+            /* Space for iPhone home indicator and better visibility */
         }
 
         .sidebar-main-content {
@@ -2958,11 +2959,18 @@
 
     // Audio Context for Professional Tones
     const sounds = {
-        sent: new Audio('https://www.soundjay.com/buttons/sounds/button-16.mp3'),
-        received: new Audio('https://www.soundjay.com/buttons/sounds/button-3.mp3'),
+        sent: new Audio('https://res.cloudinary.com/dyg9p7m7u/video/upload/v1710520000/sent.mp3'),
+        received: new Audio('https://res.cloudinary.com/dyg9p7m7u/video/upload/v1710520001/received.mp3'),
         recording: new Audio('https://www.soundjay.com/buttons/sounds/button-20.mp3'),
-        notif: new Audio('https://www.soundjay.com/buttons/sounds/button-09.mp3')
+        notif: new Audio('https://res.cloudinary.com/dyg9p7m7u/video/upload/v1710520002/notif.mp3'),
+        emoji: new Audio('https://www.soundjay.com/human/sounds/laughter-2.mp3') // Placeholder or bubble pop
     };
+    
+    // Better sounds for premium feel
+    sounds.sent.src = 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'; // Pop
+    sounds.received.src = 'https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'; // Bubble
+    sounds.notif.src = 'https://assets.mixkit.co/active_storage/sfx/2361/2361-preview.mp3'; // Ding
+    sounds.emoji.src = 'https://assets.mixkit.co/active_storage/sfx/2359/2359-preview.mp3'; // Tiny pop
 
     function playSound(key) {
         sounds[key].currentTime = 0;
@@ -3459,6 +3467,7 @@
                 updateMessageReactions(data.message_id, data.reactions);
                 if (data.trigger_emoji && data.trigger_sender !== currentUsername) {
                     triggerLiveEmoji(data.trigger_emoji);
+                    playSound('emoji');
                 }
             } else if (data.action === 'reaction') {
                 // Legacy handler - should be replaced by reaction_update
@@ -3729,7 +3738,10 @@
     }
 
     function castVote(pId, oId) { chatSocket.send(JSON.stringify({ 'action': 'vote_poll', 'poll_id': pId, 'option_id': oId })); }
-    function sendReaction(mId, e) { chatSocket.send(JSON.stringify({ 'action': 'reaction', 'message_id': mId, 'emoji': e })); }
+    function sendReaction(mId, e) { 
+        chatSocket.send(JSON.stringify({ 'action': 'reaction', 'message_id': mId, 'emoji': e })); 
+        playSound('emoji');
+    }
     function togglePin(mId) { chatSocket.send(JSON.stringify({ 'action': 'pin_message', 'message_id': mId, 'is_pinned': true })); }
 
     function editMessage(mId, oldText) {
@@ -5165,6 +5177,9 @@
     // PWA Install Logic
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', (e) => {
+        // Only show if user hasn't dismissed it before
+        if (localStorage.getItem('pwa-banner-dismissed')) return;
+
         e.preventDefault();
         deferredPrompt = e;
         // Show banner after a small delay
@@ -5177,6 +5192,8 @@
     function hidePWABanner() {
         const banner = document.getElementById('pwa-banner');
         if (banner) banner.style.transform = 'translateX(-50%) translateY(150%)';
+        // Remember dismissal for this device
+        localStorage.setItem('pwa-banner-dismissed', 'true');
     }
 
     async function installPWAFromBanner() {
