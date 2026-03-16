@@ -99,10 +99,13 @@ CHANNEL_LAYERS = {
 
 DATABASES = {
     'default': dj_database_url.config(
-        default=f"postgres://shivam:Shivam@1909@localhost:5432/bolio",
-        conn_max_age=600
+        # Replace this with your actual Render external database URL if you're not using DATABASE_URL env var
+        default=os.getenv('DATABASE_URL', 'postgres://shivam:Shivam@1909@localhost:5432/bolio'),
+        conn_max_age=600,
+        ssl_require=True if os.getenv('DATABASE_URL') else False
     )
 }
+
 
 
 # Password validation
