@@ -131,9 +131,10 @@
         height: 100%; 
         object-fit: cover; 
         background: #000;
-        transform: rotateY(180deg); /* Mirror effect for self if desired, but we usually mirror local only */
     }
-    #local-video { transform: rotateY(180deg); }
+    
+    #local-video { transform: rotateY(180deg); transition: transform 0.3s ease; }
+    #local-video.no-mirror { transform: rotateY(0deg); }
 
     .video-label {
         position: absolute;
@@ -308,6 +309,18 @@
         
         .side-panel { position: fixed; inset: 0; width: 100%; height: 100%; transform: translateX(100%); transition: transform 0.3s ease; }
         .side-panel:not(.hidden) { transform: translateX(0); }
+    }
+
+    /* Anti-Snapshot Body State */
+    body.app-inactive {
+        filter: blur(50px) brightness(0.1) grayscale(1) !important;
+        pointer-events: none !important;
+        user-select: none !important;
+        transition: filter 0.3s ease;
+    }
+    
+    @media print {
+        body { display: none !important; }
     }
 </style>
 {% endblock %}
@@ -713,7 +726,9 @@
                 }
                 
                 // Preview locally
-                document.getElementById('local-video').srcObject = screenStream;
+                const localVid = document.getElementById('local-video');
+                localVid.srcObject = screenStream;
+                localVid.classList.add('no-mirror');
                 document.getElementById('btn-screen').classList.add('primary');
                 
                 videoTrack.onended = () => stopScreenShare();
@@ -735,7 +750,9 @@
                 const sender = senders.find(s => s.track.kind === 'video');
                 if (sender) sender.replaceTrack(videoTrack);
             }
-            document.getElementById('local-video').srcObject = localStream;
+            const localVid = document.getElementById('local-video');
+            localVid.srcObject = localStream;
+            localVid.classList.remove('no-mirror');
         }
         document.getElementById('btn-screen').classList.remove('primary');
     }
@@ -819,7 +836,29 @@
 
     // INITIALIZE
     connectSocket();
-    
+
+    // Anti-Snapshot Focus Logic
+    window.addEventListener('blur', () => document.body.classList.add('app-inactive'));
+    window.addEventListener('focus', () => document.body.classList.remove('app-inactive'));
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) document.body.classList.add('app-inactive');
+        else document.body.classList.remove('app-inactive');
+    });
+
+    // Disable screenshot keys
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'PrintScreen' || 
+            (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'S')) || 
+            (e.ctrlKey && e.key === 'p') ||
+            (e.metaKey && e.shiftKey && (e.key === '4' || e.key === '3'))) {
+            
+            alert('Privacy Protection: Screenshots and screen recording are restricted.');
+            e.preventDefault();
+            document.body.classList.add('app-inactive');
+            setTimeout(() => document.body.classList.remove('app-inactive'), 2000);
+        }
+    });
+
     // Notes persistence
     const notes = document.getElementById('personal-notes');
     notes.value = localStorage.getItem(`notes_${roomCode}`) || '';
