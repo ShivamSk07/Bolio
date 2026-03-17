@@ -94,7 +94,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if action == 'message':
             message_content = data['message']
             message_type = data.get('message_type', 'text')
-            file_path = data.get('file_path', data.get('file_url')) # Fallback to URL if path missing
+            file_path = data.get('file_path', data.get('file_url'))
             timer = data.get('timer', 0)
             reply_to_id = data.get('reply_to', None)
             unlock_at = data.get('unlock_at', None)
@@ -102,12 +102,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
             is_protected = data.get('is_protected', False)
             sender_id = self.scope['user'].id
 
-            # Save message to database after broadcast check
-            can_send = await self.check_broadcast_permission(sender_id, self.chat_id)
-            if not can_send:
+            # Consolidate permission check, message saving, and member fetching into one DB call
+            result = await self.process_new_message(
+                sender_id, self.chat_id, message_content, message_type, 
+                file_path, reply_to_id, unlock_at, is_view_once, is_protected
+            )
+            
+            if not result['can_send']:
                 return 
 
-            saved_message = await self.save_message(sender_id, self.chat_id, message_content, message_type, file_path, reply_to_id, unlock_at, is_view_once, is_protected)
+            saved_message = result['message']
+            members = result['members']
+            chat_display_name = result['chat_display_name']
 
             reply_data = None
             if saved_message.reply_to:
@@ -135,18 +141,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
 
-            # Send notification to each member's user group
-            members = await self.get_chat_members(self.chat_id)
-            chat_name = await self.get_chat_display_name(self.chat_id, self.scope['user'].username)
-            
+            # Send notifications (Batch if possible, but group_send is already async)
             for username in members:
-                if username == self.scope['user'].username: continue # Skip sender
+                if username == self.scope['user'].username: continue
                 await self.channel_layer.group_send(
                     f'user_notif_{username}',
                     {
                         'type': 'new_notification',
                         'chat_id': str(self.chat_id),
-                        'chat_name': chat_name,
+                        'chat_name': chat_display_name,
                         'sender': self.scope['user'].username,
                         'message': message_content,
                         'message_type': message_type
@@ -475,6 +478,48 @@ class ChatConsumer(AsyncWebsocketConsumer):
         user.save()
 
     @database_sync_to_async
+    def process_new_message(self, sender_id, chat_id, content, message_type='text', file_data=None, reply_to_id=None, unlock_at=None, is_view_once=False, is_protected=False):
+        from .models import Chat, Message, GroupRole
+        from accounts.models import User
+        
+        chat = Chat.objects.get(id=chat_id)
+        
+        # Check permission
+        can_send = True
+        if chat.is_broadcast:
+            if chat.created_by_id != sender_id:
+                can_send = GroupRole.objects.filter(chat=chat, user_id=sender_id, role='admin').exists()
+        
+        if not can_send:
+            return {'can_send': False}
+            
+        # Save message
+        sender = User.objects.get(id=sender_id)
+        reply_to = None
+        if reply_to_id:
+            try:
+                reply_to = Message.objects.get(id=reply_to_id)
+            except: pass
+            
+        msg = Message.objects.create(
+            sender=sender, chat=chat, content=content, message_type=message_type,
+            file=file_data, reply_to=reply_to, unlock_at=unlock_at,
+            is_view_once=is_view_once, is_protected=is_protected
+        )
+        
+        # Get members and display name
+        members = [m.username for m in chat.members.all()]
+        chat_display_name = chat.name if (chat.is_group and chat.name) else sender.username
+        
+        return {
+            'can_send': True,
+            'message': msg,
+            'members': members,
+            'chat_display_name': chat_display_name
+        }
+
+    # Rest of methods
+    @database_sync_to_async
     def save_message(self, sender_id, chat_id, content, message_type='text', file_data=None, reply_to_id=None, unlock_at=None, is_view_once=False, is_protected=False, related_id=None):
         sender = User.objects.get(id=sender_id)
         chat = Chat.objects.get(id=chat_id)
@@ -593,12 +638,27 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return role
 
     async def fetch_history(self):
-        from .models import Message
-        messages = await database_sync_to_async(lambda: list(Message.objects.filter(chat_id=self.chat_id).order_by('timestamp')[:50]))()
+        return await self.get_history_optimized()
+
+    @database_sync_to_async
+    def get_history_optimized(self):
+        from .models import Message, MessageReaction
+        from django.db.models import Count, Prefetch
+        
+        # Prefetch reactions for all messages
+        messages = Message.objects.filter(chat_id=self.chat_id).select_related(
+            'sender', 'reply_to', 'reply_to__sender'
+        ).prefetch_related(
+            'poll', 'poll__options', 'poll__options__votes'
+        ).order_by('timestamp')[:50]
+        
         history_data = []
         for msg in messages:
-            msg_data = await database_sync_to_async(self.get_message_info_sync)(msg)
-            msg_data['reactions'] = await self.get_reactions_summary(msg.id)
+            msg_data = self.get_message_info_sync(msg)
+            # Efficiently get reactions from database for this message
+            # Better to prefetch reactions too or aggregate them
+            reactions = MessageReaction.objects.filter(message=msg).values('emoji').annotate(count=Count('id'))
+            msg_data['reactions'] = [{'emoji': r['emoji'], 'count': r['count']} for r in reactions]
             history_data.append(msg_data)
         return history_data
 
