@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}FAQ - Bolio{% endblock %}
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto; padding: 60px 20px;">
+    <div style="text-align: center; margin-bottom: 50px;">
+        <h1 style="font-size: 2.5rem; font-weight: 900; letter-spacing: -1px; margin-bottom: 10px;">Frequently Asked Questions</h1>
+        <p style="color: var(--text-muted);">Find answers to common questions about Bolio.</p>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+        <div style="background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 20px; padding: 30px;">
+            <h3 style="margin-bottom: 15px; color: var(--primary);">What is Bolio?</h3>
+            <p style="color: var(--text-muted); line-height: 1.6;">Bolio is a secure, real-time communication platform designed for privacy and professional use, featuring HD video calls, encrypted messaging, and time capsules.</p>
+        </div>
+
+        <div style="background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 20px; padding: 30px;">
+            <h3 style="margin-bottom: 15px; color: var(--primary);">Are my calls secure?</h3>
+            <p style="color: var(--text-muted); line-height: 1.6;">Yes, all video and voice calls use WebRTC with peer-to-peer encryption, ensuring that only the participants can access the media stream.</p>
+        </div>
+
+        <div style="background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 20px; padding: 30px;">
+            <h3 style="margin-bottom: 15px; color: var(--primary);">How do I report a bug?</h3>
+            <p style="color: var(--text-muted); line-height: 1.6;">You can use the "Report a Problem" link in settings to send us details about any issues you encounter.</p>
+        </div>
+    </div>
+
+    <div style="margin-top: 50px; text-align: center;">
+        <a href="{% url 'settings' %}" style="color: var(--primary); text-decoration: none; font-weight: 700;">&larr; Back to Settings</a>
+    </div>
+</div>
+{% endblock %}

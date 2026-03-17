@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}Privacy Policy - Bolio{% endblock %}
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto; padding: 60px 20px;">
+    <div style="text-align: center; margin-bottom: 50px;">
+        <h1 style="font-size: 2.5rem; font-weight: 900; letter-spacing: -1px; margin-bottom: 10px;">Privacy Policy</h1>
+        <p style="color: var(--text-muted);">Your data security is our top priority.</p>
+    </div>
+
+    <div style="background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 24px; padding: 40px; color: var(--text-muted); line-height: 1.8;">
+        <h2 style="color: white; margin-bottom: 20px;">1. Data Collection</h2>
+        <p>We collect minimal data required for communication, including your username, phone number, and profile information. We do not sell or share your data with third parties.</p>
+
+        <h2 style="color: white; margin: 30px 0 20px;">2. Communication Security</h2>
+        <p>Messages and calls are processed through encrypted channels. While we store messages to sync across devices, they are stored using industry-standard protection.</p>
+
+        <h2 style="color: white; margin: 30px 0 20px;">3. Private Accounts</h2>
+        <p>If you enable a private account, only users you explicitly approve can initiate a conversation with you.</p>
+
+        <h2 style="color: white; margin: 30px 0 20px;">4. Media Storage</h2>
+        <p>Media files (images, videos) provided in chats are stored securely. You can delete your data at any time through the "Delete Account" option in settings.</p>
+    </div>
+
+    <div style="margin-top: 50px; text-align: center;">
+        <a href="{% url 'settings' %}" style="color: var(--primary); text-decoration: none; font-weight: 700;">&larr; Back to Settings</a>
+    </div>
+</div>
+{% endblock %}

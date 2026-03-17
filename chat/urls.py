@@ -30,4 +30,7 @@ urlpatterns = [
     path('admit-user/', views.admit_user, name='admit_user'),
     path('room-info/<str:room_code>/', views.get_room_info, name='room_info'),
     path('finish-tour/', views.finish_tour, name='finish_tour'),
+    path('faq/', views.faq_view, name='faq'),
+    path('report-problem/', views.report_problem_view, name='report_problem'),
+    path('privacy-policy/', views.privacy_policy_view, name='privacy_policy'),
 ]

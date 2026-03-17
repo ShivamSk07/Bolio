@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}Report a Problem - Bolio{% endblock %}
+{% block content %}
+<div style="max-width: 600px; margin: 0 auto; padding: 60px 20px;">
+    <div style="text-align: center; margin-bottom: 40px;">
+        <h1 style="font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">Report a Problem</h1>
+        <p style="color: var(--text-muted);">Is something not working? Let us know.</p>
+    </div>
+
+    <div style="background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 24px; padding: 40px;">
+        <form onsubmit="event.preventDefault(); alert('Thank you for your report! Our team will look into it.'); window.location.href='/settings/';">
+            <div style="margin-bottom: 25px;">
+                <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Problem Category</label>
+                <select style="width: 100%; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); border-radius: 12px; padding: 14px; color: white; outline: none;">
+                    <option>Video/Audio Call Issue</option>
+                    <option>Messaging Error</option>
+                    <option>Account/Login Issue</option>
+                    <option>UI/Design Bug</option>
+                    <option>Performance/Lag</option>
+                    <option>Other</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 25px;">
+                <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Description</label>
+                <textarea style="width: 100%; height: 150px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); border-radius: 12px; padding: 14px; color: white; outline: none; resize: none;" placeholder="Explain what happened..."></textarea>
+            </div>
+
+            <button type="submit" style="width: 100%; height: 55px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 16px; font-weight: 700; cursor: pointer; transition: 0.3s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">Submit Report</button>
+        </form>
+    </div>
+
+    <div style="margin-top: 40px; text-align: center;">
+        <a href="{% url 'settings' %}" style="color: var(--primary); text-decoration: none; font-weight: 700;">&larr; Cancel</a>
+    </div>
+</div>
+{% endblock %}

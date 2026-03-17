@@ -10,13 +10,77 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="manifest" href="{% static 'manifest.json' %}">
     <meta name="theme-color" content="#3b82f6">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --bg-card: #0a0a0a;
+            --text-muted: #8e8e8e;
+            --danger: #ef4444;
+        }
+        .universal-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(10px);
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .universal-modal.show { display: flex; }
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 40px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            animation: modalZoom 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes modalZoom {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+    </style>
     {% block extra_head %}{% endblock %}
 </head>
 <body>
     <div id="app">
         {% block content %}{% endblock %}
     </div>
+
+    <!-- Universal Alert Modal -->
+    <div id="universal-alert" class="universal-modal">
+        <div class="modal-content">
+            <div id="u-alert-icon-box" style="width:60px; height:60px; border-radius:18px; background:rgba(59,130,246,0.1); display:flex; align-items:center; justify-content:center; margin:0 auto 20px;">
+                <i data-lucide="alert-circle" id="u-alert-icon" style="color:var(--primary); width:30px; height:30px;"></i>
+            </div>
+            <h3 id="u-alert-title" style="font-weight:800; margin-bottom:10px; font-size:1.25rem; color:white;">Notification</h3>
+            <p id="u-alert-msg" style="color:var(--text-muted); font-size:0.9rem; line-height:1.6; margin-bottom:30px;">Something happened.</p>
+            <button onclick="closeAlert()" style="width:100%; height:50px; border-radius:14px; background:var(--primary-gradient); color:white; border:none; font-weight:700; cursor:pointer;">OK</button>
+        </div>
+    </div>
+
     <script>
+        function showAlert(title, msg, icon = 'alert-circle') {
+            document.getElementById('u-alert-title').innerText = title;
+            document.getElementById('u-alert-msg').innerText = msg;
+            const iconEl = document.getElementById('u-alert-icon');
+            iconEl.setAttribute('data-lucide', icon);
+            document.getElementById('universal-alert').classList.add('show');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+        function closeAlert() {
+            document.getElementById('universal-alert').classList.remove('show');
+        }
+
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/static/sw.js')
@@ -24,6 +88,7 @@
                     .catch(err => console.log('SW Reg Failed', err));
             });
         }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     </script>
     {% block extra_js %}{% endblock %}
 </body>

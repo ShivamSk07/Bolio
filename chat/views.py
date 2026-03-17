@@ -130,7 +130,8 @@ def update_profile(request):
             user.profile_photo = request.FILES['profile_photo']
         
         user.save()
-        return JsonResponse({'status': 'success'})
+        photo_url = user.profile_photo.url if user.profile_photo else None
+        return JsonResponse({'status': 'success', 'photo_url': photo_url})
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
 @csrf_exempt
@@ -702,3 +703,12 @@ def finish_tour(request):
     request.user.has_seen_tour = True
     request.user.save()
     return JsonResponse({'status': 'success'})
+
+def faq_view(request):
+    return render(request, 'chat/faq.html')
+
+def report_problem_view(request):
+    return render(request, 'chat/report_problem.html')
+
+def privacy_policy_view(request):
+    return render(request, 'chat/privacy_policy.html')

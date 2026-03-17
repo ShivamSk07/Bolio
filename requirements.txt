@@ -12,3 +12,5 @@ google-genai
 groq
 uvicorn
 dj-database-url
+cloudinary
+django-cloudinary-storage

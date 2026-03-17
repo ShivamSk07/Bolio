@@ -562,18 +562,18 @@
         </div>
 
         <div class="settings-section">
-            <div class="settings-item" onclick="alert('Feature coming soon: Reporting a problem...')">
+            <a href="{% url 'report_problem' %}" class="settings-item">
                 <div class="item-label">Report a Problem</div>
                 <i data-lucide="chevron-right" class="item-chevron"></i>
-            </div>
-            <div class="settings-item" onclick="alert('Feature coming soon: Bolio FAQ...')">
+            </a>
+            <a href="{% url 'faq' %}" class="settings-item">
                 <div class="item-label">Bolio FAQ</div>
                 <i data-lucide="chevron-right" class="item-chevron"></i>
-            </div>
-            <div class="settings-item" onclick="alert('Feature coming soon: Privacy Policy...')">
+            </a>
+            <a href="{% url 'privacy_policy' %}" class="settings-item">
                 <div class="item-label">Privacy Policy</div>
                 <i data-lucide="chevron-right" class="item-chevron"></i>
-            </div>
+            </a>
         </div>
 
         <div style="text-align: center; margin-top: 40px;">
@@ -583,6 +583,16 @@
     </div>
 
 </div>
+
+<!-- Custom Alert Modal removed in favor of base.html universal-alert -->
+
+
+<style>
+    @keyframes zoomIn {
+        from { transform: scale(0.9); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+</style>
 
 <script>
     lucide.createIcons();
@@ -626,8 +636,11 @@
         });
         const d = await r.json();
         if (d.status === 'success') {
-            alert('Profile updated!');
-            window.location.reload();
+            if (d.photo_url) {
+                document.getElementById('preview-img').src = d.photo_url;
+                document.querySelector('.avatar-lg').src = d.photo_url;
+            }
+            showAlert('Success', 'Profile updated successfully!', 'check-circle');
         }
     }
 
@@ -643,7 +656,7 @@
             headers: { 'X-CSRFToken': '{{ csrf_token }}' }
         });
         const d = await r.json();
-        if (d.status === 'success') alert('Account settings saved!');
+        if (d.status === 'success') showAlert('Account Updated', 'Your account settings have been saved.');
     }
 
     async function savePrivacy() {
@@ -659,7 +672,7 @@
             headers: { 'X-CSRFToken': '{{ csrf_token }}' }
         });
         const d = await r.json();
-        if (d.status === 'success') alert('Privacy settings updated!');
+        if (d.status === 'success') showAlert('Privacy Updated', 'Sensitive settings updated successfully.', 'shield');
     }
 
     async function saveAppearance() {
@@ -672,7 +685,7 @@
             headers: { 'X-CSRFToken': '{{ csrf_token }}' }
         });
         const d = await r.json();
-        if (d.status === 'success') alert('Appearance updated!');
+        if (d.status === 'success') showAlert('Appearance Updated', 'New look applied to your chats.', 'palette');
     }
 
     async function toggleBlock(userId) {

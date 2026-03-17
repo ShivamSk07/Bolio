@@ -2552,17 +2552,7 @@
     </div>
 </div>
 
-<!-- Custom Alert Modal -->
-<div id="alert-modal" class="modal">
-    <div class="modal-card" style="text-align: center; padding: 30px;">
-        <div id="alert-icon" style="width: 60px; height: 60px; background: rgba(59, 130, 246, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
-            <i data-lucide="alert-circle" style="color: var(--primary); width: 30px; height: 30px;"></i>
-        </div>
-        <h3 id="alert-title" style="margin-bottom: 10px; font-weight: 800;">Notification</h3>
-        <p id="alert-message" style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; margin-bottom: 25px;">Message goes here.</p>
-        <button class="btn-primary" onclick="hideModal('alert-modal')" style="width: 100%; height: 48px; border-radius: 14px;">OK</button>
-    </div>
-</div>
+<!-- Alert modal removed for base.html universal-alert -->
 
 <div id="qr-modal" class="modal"
     style="background:none; backdrop-filter:none; justify-content:flex-end; align-items:flex-end; padding:0 30px 100px 0;">
@@ -3000,14 +2990,37 @@
         received: new Audio('https://res.cloudinary.com/dyg9p7m7u/video/upload/v1710520001/received.mp3'),
         recording: new Audio('https://www.soundjay.com/buttons/sounds/button-20.mp3'),
         notif: new Audio('https://res.cloudinary.com/dyg9p7m7u/video/upload/v1710520002/notif.mp3'),
-        emoji: new Audio('https://www.soundjay.com/human/sounds/laughter-2.mp3') // Placeholder or bubble pop
+        emoji: new Audio('https://www.soundjay.com/human/sounds/laughter-2.mp3'),
+        ringtone: new Audio('https://assets.mixkit.co/active_storage/sfx/1350/1350-preview.mp3') // Premium ring
     };
     
     // Better sounds for premium feel
-    sounds.sent.src = 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'; // Pop
-    sounds.received.src = 'https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'; // Bubble
-    sounds.notif.src = 'https://assets.mixkit.co/active_storage/sfx/2361/2361-preview.mp3'; // Ding
-    sounds.emoji.src = 'https://assets.mixkit.co/active_storage/sfx/2359/2359-preview.mp3'; // Tiny pop
+    sounds.sent.src = 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'; 
+    sounds.received.src = 'https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'; 
+    sounds.notif.src = 'https://assets.mixkit.co/active_storage/sfx/2361/2361-preview.mp3'; 
+    sounds.emoji.src = 'https://assets.mixkit.co/active_storage/sfx/2359/2359-preview.mp3'; 
+
+    let ringInterval = null;
+    function startRinging() {
+        sounds.ringtone.loop = true;
+        sounds.ringtone.play().catch(e => console.log("Ringing blocked"));
+        if (navigator.vibrate) {
+            navigator.vibrate([500, 300, 500, 300]);
+            ringInterval = setInterval(() => {
+                navigator.vibrate([500, 300, 500, 300]);
+            }, 1600);
+        }
+    }
+
+    function stopRinging() {
+        sounds.ringtone.pause();
+        sounds.ringtone.currentTime = 0;
+        if (ringInterval) {
+            clearInterval(ringInterval);
+            ringInterval = null;
+        }
+        if (navigator.vibrate) navigator.vibrate(0);
+    }
 
     function playSound(key) {
         sounds[key].currentTime = 0;
@@ -3116,6 +3129,11 @@
             lucide.createIcons();
         }
     }
+    function hideModal(id) {
+        const m = document.getElementById(id);
+        if (m) m.classList.remove('show');
+    }
+
     function hideModal(id) {
         const m = document.getElementById(id);
         if (m) m.classList.remove('show');
@@ -4021,8 +4039,9 @@
 
     function handleFileUpload(input) {
         if (!input.files || !input.files[0]) return;
+        const file = input.files[0];
         const f = new FormData();
-        f.append('file', input.files[0]);
+        f.append('file', file);
 
         const isViewOnce = document.getElementById('view-once-toggle').checked;
         const isProtected = document.getElementById('protected-toggle').checked;
@@ -4035,19 +4054,22 @@
             .then(r => r.json())
             .then(data => {
                 let type = 'file';
-                if (input.accept.includes('image')) type = 'image';
-                else if (input.accept.includes('video')) type = 'video';
+                const mime = file.type;
+                if (mime.startsWith('image/')) type = 'image';
+                else if (mime.startsWith('video/')) type = 'video';
+                else if (mime.startsWith('audio/')) type = 'audio';
 
                 chatSocket.send(JSON.stringify({
                     'action': 'message',
-                    'message': `Shared an ${type}`,
+                    'message': file.name,
                     'message_type': type,
                     'file_url': data.file_url,
                     'is_view_once': isViewOnce,
                     'is_protected': isProtected
                 }));
 
-                // Reset privacy toggles
+                // Reset
+                input.value = "";
                 document.getElementById('view-once-toggle').checked = false;
                 document.getElementById('protected-toggle').checked = false;
                 toggleFeatureMenu();
@@ -4541,11 +4563,11 @@
             voiceTimerInterval = setInterval(updateVoiceTimer, 100);
 
             sendTypingStatus(true, 'recording');
-        } catch (err) { alert('Microphone access denied'); }
+        } catch (err) { showAlert('Error', 'Microphone access denied', 'mic-off'); }
     }
 
     async function startCall(type) {
-        if (!chatSocket) return alert("Select a chat first");
+        if (!chatSocket) return showAlert("Notice", "Select a chat first", "message-square");
         callType = type;
         iceCandidatesQueue = [];
         showCallUI('outgoing');
@@ -4687,9 +4709,11 @@
         callType = data.call_type;
         iceCandidatesQueue = [];
         showCallUI('incoming', data.sender);
+        startRinging();
 
         // Pre-init to start buffering if possible, though we need offer first
         window.acceptCall = async () => {
+            stopRinging();
             // Register Incoming Log
             registerCallLog(data.sender, callType, 'incoming');
 
@@ -4771,6 +4795,7 @@
     }
 
     function endCallUI() {
+        stopRinging();
         if (localStream) localStream.getTracks().forEach(t => t.stop());
         if (peerConnection) {
             peerConnection.close();
@@ -4830,7 +4855,7 @@
                 lucide.createIcons();
             } catch (err) {
                 console.error("Video upgrade failed", err);
-                alert("Camera access denied or unavailable.");
+                showAlert("Error", "Camera access denied or unavailable.", "video-off");
             }
         } else {
             videoTrack.enabled = !videoTrack.enabled;
