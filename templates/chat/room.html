@@ -451,7 +451,7 @@
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:stun2.l.google.com:19302' }
         ],
-        iceCandidatePoolSize: 10
+        iceCandidatePoolSize: 2
     };
 
     // UI UPDATES
@@ -481,7 +481,19 @@
     // WEBRTC LOGIC
     async function initCamera() {
         try {
-            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            const constraints = {
+                video: {
+                    width: { ideal: 640 },
+                    height: { ideal: 360 },
+                    frameRate: { ideal: 24 }
+                },
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
+            };
+            localStream = await navigator.mediaDevices.getUserMedia(constraints);
             document.getElementById('local-video').srcObject = localStream;
             
             // Broadcast readiness to everyone in the room
@@ -715,7 +727,12 @@
     async function toggleScreenShare() {
         if (!screenStream) {
             try {
-                screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                screenStream = await navigator.mediaDevices.getDisplayMedia({ 
+                    video: {
+                        cursor: "always",
+                        frameRate: { ideal: 10, max: 15 }
+                    } 
+                });
                 const videoTrack = screenStream.getVideoTracks()[0];
                 
                 // Replace video track in all peers
