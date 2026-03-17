@@ -675,6 +675,8 @@
         display: flex;
         flex-direction: column;
         gap: 8px;
+        overscroll-behavior-y: contain;
+        scroll-behavior: smooth;
     }
 
     .msg-area.theme-midnight {
@@ -1534,6 +1536,7 @@
         }
     }
 
+
     /* Lightbox Premium Style */
     .lightbox {
         position: fixed;
@@ -2090,7 +2093,7 @@
                             ...</div>
                     </div>
                     <input type="text" class="msg-input" id="msg-input" placeholder="Message..."
-                        oninput="sendTypingStatus(true)">
+                        oninput="handleTyping()">
                 </div>
 
                 <div id="recording-overlay" class="hidden"
@@ -3715,8 +3718,21 @@
         msgDiv.onmouseleave = () => actions.style.display = 'none';
 
         messageContainer.appendChild(msgDiv);
-        messageContainer.scrollTop = messageContainer.scrollHeight;
-        lucide.createIcons();
+        
+        // Smarter Scroll: Wait for layout and then scroll
+        setTimeout(() => {
+            messageContainer.scrollTo({
+                top: messageContainer.scrollHeight,
+                behavior: 'smooth'
+            });
+        }, 30);
+
+        // Targeted Icon Generation
+        lucide.createIcons({
+            attrs: { 'stroke-width': 2, class: 'lucide' },
+            nameAttr: 'data-lucide',
+            root: msgDiv
+        });
 
         // Handle initial reactions from history
         if (data.reactions && data.reactions.length > 0) {
@@ -3790,7 +3806,13 @@
 
         if (val && chatSocket) {
             const tempId = 'temp-' + Date.now();
+            messageInput.value = ''; // Instant clear
+            cancelReply();
             
+            // RESET PRIVACY TOGGLES INUI
+            document.getElementById('view-once-toggle').checked = false;
+            document.getElementById('protected-toggle').checked = false;
+
             // OPTIMISTIC UPDATE
             addMessage({
                 id: tempId,
@@ -3809,37 +3831,38 @@
                 'reply_to': replyingToId,
                 'is_view_once': isViewOnce,
                 'is_protected': isProtected,
-                'tempId': tempId // Send tempId back to server
+                'tempId': tempId
             }));
-            messageInput.value = '';
-            cancelReply();
-            // Reset privacy toggles
-            document.getElementById('view-once-toggle').checked = false;
-            document.getElementById('protected-toggle').checked = false;
+
+            playSound('sent');
         }
     };
 
     messageInput.onkeyup = e => { if (e.keyCode === 13) sendBtn.click(); };
 
-    function sendTypingStatus(st, type = 'typing') {
-        if (!chatSocket) return;
+    let lastTypingSent = 0;
+    function handleTyping() {
+        const now = Date.now();
+        if (now - lastTypingSent > 2000) { 
+            sendTypingStatus(true);
+            lastTypingSent = now;
+        }
+        
         if (typingTimeout) clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            sendTypingStatus(false);
+            lastTypingSent = 0;
+        }, 1500); // 1.5s is more responsive for WhatsApp style
+    }
+
+    function sendTypingStatus(st, type = 'typing') {
+        if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) return;
 
         chatSocket.send(JSON.stringify({
             'action': 'typing',
             'is_typing': st,
             'typing_type': type
         }));
-
-        if (st && type === 'typing') {
-            typingTimeout = setTimeout(() => {
-                chatSocket.send(JSON.stringify({
-                    'action': 'typing',
-                    'is_typing': false,
-                    'typing_type': 'typing'
-                }));
-            }, 700);
-        }
     }
 
     // Audio Logic (WhatsApp Style)

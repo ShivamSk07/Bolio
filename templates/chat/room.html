@@ -163,17 +163,18 @@
 
     /* CONTROLS BAR */
     .controls { 
-        height: 90px;
+        height: 80px;
         padding: 0 20px; 
         display: flex; 
         justify-content: center; 
         align-items: center;
         gap: 16px; 
-        background: rgba(0,0,0,0.8); 
+        background: rgba(0,0,0,0.85); 
         backdrop-filter: blur(30px); 
         z-index: 100; 
         border-top: 1px solid var(--glass-border);
         flex-shrink: 0;
+        box-sizing: border-box;
     }
     
     .btn-control { 
@@ -301,7 +302,7 @@
         .video-grid.count-2, .video-grid.count-3, .video-grid.count-4 { grid-template-columns: 1fr; }
         .video-card { aspect-ratio: 1/1; border-radius: 12px; }
         
-        .controls { height: 80px; gap: 8px; padding: 0 10px; padding-bottom: env(safe-area-inset-bottom); box-sizing: content-box; }
+        .controls { height: 70px; gap: 8px; padding: 0 10px; padding-bottom: env(safe-area-inset-bottom); box-sizing: content-box; }
         .btn-control { width: 42px; height: 42px; border-radius: 12px; }
         .btn-leave { width: 56px !important; }
         
@@ -766,11 +767,28 @@
     }
 
     function handleAdmission(userId, action) {
-        fetch('/admit-user/', {
-            method: 'POST',
-            body: JSON.stringify({ room_code: roomCode, user_id: userId, action: action }),
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }
-        }).then(() => refreshWaitingList());
+        if (!roomSocket || roomSocket.readyState !== WebSocket.OPEN) {
+            // Fallback to AJAX if socket is not ready, but preferred via socket
+            fetch('/admit-user/', {
+                method: 'POST',
+                body: JSON.stringify({ room_code: roomCode, user_id: userId, action: action }),
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }
+            }).then(() => refreshWaitingList());
+            return;
+        }
+
+        roomSocket.send(JSON.stringify({
+            action: 'admit-response',
+            target_user_id: userId,
+            action_type: action
+        }));
+        
+        // Optimistically update UI
+        if (action === 'admit') {
+            const toast = document.getElementById(`toast-${userId}`);
+            if (toast) toast.remove();
+        }
+        setTimeout(refreshWaitingList, 500);
     }
 
     function showAdmissionToast(name, id) {

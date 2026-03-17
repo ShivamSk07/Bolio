@@ -471,10 +471,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def webrtc_signal(self, event):
         # Forward WebRTC signal to the other peer(s)
         # Exclude sender from receiving their own signal
-        sender_username = self.scope['user'].username if self.scope['user'].is_authenticated else "Anonymous"
-        if event['sender'] == sender_username:
+        if event['sender'] == self.scope['user'].username:
             return
-        await self.send(text_data=json.dumps(event['data']))
+            
+        data = event['data']
+        # Ensure sender info is in the payload for the client to know who to reply to
+        data['sender'] = event['sender']
+        await self.send(text_data=json.dumps(data))
 
     async def group_update(self, event):
         await self.send(text_data=json.dumps(event))
@@ -498,10 +501,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
         from .models import Chat, Message, GroupRole
         from accounts.models import User
         
-        # Optimize: Fetch only necessary fields
-        chat = Chat.objects.select_related('created_by').prefetch_related('members').get(id=chat_id)
+        # Optimize: Only fetch ID and crucial fields for permission check
+        chat = Chat.objects.prefetch_related('members').only('id', 'is_broadcast', 'created_by_id', 'name', 'is_group').get(id=chat_id)
         
-        # Check permission
+        # Check if sender is a member
+        if not chat.members.filter(id=sender_id).exists():
+            return {'can_send': False}
+
+        # Check permission for broadcast
         can_send = True
         if chat.is_broadcast:
             if chat.created_by_id != sender_id:
@@ -510,28 +517,28 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not can_send:
             return {'can_send': False}
             
+        # Get member usernames efficiently BEFORE saving (to reduce time locked)
+        member_usernames = list(chat.members.values_list('username', flat=True))
+        
         # Save message
-        sender = User.objects.get(id=sender_id)
         reply_to = None
         if reply_to_id:
-            try:
-                reply_to = Message.objects.get(id=reply_to_id)
+            try: reply_to = Message.objects.only('id', 'sender__username', 'content').get(id=reply_to_id)
             except: pass
             
         msg = Message.objects.create(
-            sender=sender, chat=chat, content=content, message_type=message_type,
+            sender_id=sender_id, chat=chat, content=content, message_type=message_type,
             file=file_data, reply_to=reply_to, unlock_at=unlock_at,
             is_view_once=is_view_once, is_protected=is_protected
         )
         
-        # Get members and display name efficiently
-        members = [m.username for m in chat.members.all()]
-        chat_display_name = chat.name if (chat.is_group and chat.name) else sender_username or sender.username
+        # Use pre-fetched member list
+        chat_display_name = chat.name if (chat.is_group and chat.name) else sender_username
         
         return {
             'can_send': True,
             'message': msg,
-            'members': members,
+            'members': member_usernames,
             'chat_display_name': chat_display_name
         }
 
@@ -920,6 +927,17 @@ class RoomConsumer(AsyncWebsocketConsumer):
                     'channel_name': self.channel_name
                 }
             )
+        elif action == 'admission-requested':
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'room_event',
+                    'action': 'admission-requested',
+                    'sender': self.username,
+                    'user_id': self.scope['user'].id,
+                    'channel_name': self.channel_name
+                }
+            )
         elif action == 'admit-response':
             # Host responding to admission request
             target_user_id = data.get('target_user_id')
@@ -940,8 +958,8 @@ class RoomConsumer(AsyncWebsocketConsumer):
             )
 
     async def room_event(self, event):
-        # Exclude sender from joining their own events unless required
-        if event.get('action') in ['user-joined', 'user-left'] and event.get('channel_name') == self.channel_name:
+        # Exclude sender from joining their own events
+        if event.get('channel_name') == self.channel_name:
             return
 
         # Merge event into dict to ensure target_user_id etc are sent
