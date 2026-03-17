@@ -498,6 +498,13 @@ def get_stories(request):
     my_stories = []
     others_stories = {}
     
+    # Get IDs of people the user has an active 1-on-1 chat with (contacts)
+    from accounts.models import User
+    from .models import Chat
+    contact_ids = set(User.objects.filter(
+        chats__in=request.user.chats.filter(status='active', is_group=False)
+    ).values_list('id', flat=True))
+    
     for s in recent_stories_qs:
         expiration_time = s.created_at + timedelta(hours=s.duration_hours)
         if expiration_time < now:
@@ -505,6 +512,10 @@ def get_stories(request):
         
         # Privacy check
         if s.user != request.user:
+            # ONLY SHOW STORIES FROM CONTACTS (People you have an active chat with)
+            if s.user.id not in contact_ids:
+                continue
+
             if s.privacy == 'selected':
                 if not s.visible_to.filter(id=request.user.id).exists():
                     continue

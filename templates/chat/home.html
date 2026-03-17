@@ -2756,7 +2756,7 @@
                     style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:2px; margin-bottom:8px;">
                     Privacy</div>
                 <div id="story-privacy-list" style="display:flex; flex-direction:column; gap:4px; background:rgba(255,255,255,0.03); border-radius:12px; padding:4px; border:1px solid rgba(255,255,255,0.05);">
-                    <div class="dropdown-item story-privacy-opt active" onclick="setStoryPrivacy('public', this)" style="padding:8px 12px; font-size:0.8rem;">🌍 Public</div>
+                    <div class="dropdown-item story-privacy-opt active" onclick="setStoryPrivacy('public', this)" style="padding:8px 12px; font-size:0.8rem;">👥 My Contacts</div>
                     <div class="dropdown-item story-privacy-opt" onclick="setStoryPrivacy('selected', this)" style="padding:8px 12px; font-size:0.8rem;">🔒 Selected</div>
                 </div>
                 <input type="hidden" id="story-privacy" value="public">
@@ -3532,10 +3532,21 @@
     }
 
     function addMessage(data) {
+        // Remove temp message if this is the real one coming back
+        if (data.tempId) {
+            const temp = document.getElementById(`msg-${data.tempId}`);
+            if (temp) temp.remove();
+        }
+
         const isSent = data.sender === currentUsername;
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${isSent ? 'sent' : 'received'}`;
         msgDiv.id = `msg-${data.id}`;
+        
+        if (data.isOptimistic) {
+            msgDiv.style.opacity = '0.7';
+            msgDiv.classList.add('optimistic');
+        }
 
         if (data.timer > 0) {
             setTimeout(() => msgDiv.remove(), data.timer * 1000);
@@ -3772,12 +3783,24 @@
     function cancelReply() { replyingToId = null; document.getElementById('reply-preview').classList.add('hidden'); }
 
     sendBtn.onclick = () => {
-        const val = messageInput.value;
+        const val = messageInput.value.trim();
         const timer = document.getElementById('auto-delete-select').value;
         const isViewOnce = document.getElementById('view-once-toggle').checked;
         const isProtected = document.getElementById('protected-toggle').checked;
 
-        if ((val || replyingToId) && chatSocket) {
+        if (val && chatSocket) {
+            const tempId = 'temp-' + Date.now();
+            
+            // OPTIMISTIC UPDATE
+            addMessage({
+                id: tempId,
+                sender: currentUsername,
+                message: val,
+                message_type: 'text',
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                isOptimistic: true
+            });
+
             chatSocket.send(JSON.stringify({
                 'action': 'message',
                 'message': val,
@@ -3785,7 +3808,8 @@
                 'timer': parseInt(timer),
                 'reply_to': replyingToId,
                 'is_view_once': isViewOnce,
-                'is_protected': isProtected
+                'is_protected': isProtected,
+                'tempId': tempId // Send tempId back to server
             }));
             messageInput.value = '';
             cancelReply();

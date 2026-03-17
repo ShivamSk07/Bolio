@@ -105,7 +105,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             # Consolidate permission check, message saving, and member fetching into one DB call
             result = await self.process_new_message(
                 sender_id, self.chat_id, message_content, message_type, 
-                file_path, reply_to_id, unlock_at, is_view_once, is_protected
+                file_path, reply_to_id, unlock_at, is_view_once, is_protected,
+                self.scope['user'].username
             )
             
             if not result['can_send']:
@@ -137,24 +138,31 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'is_view_once': is_view_once,
                     'is_protected': is_protected,
                     'sender': self.scope['user'].username,
-                    'timestamp': saved_message.timestamp.strftime('%H:%M')
+                    'timestamp': saved_message.timestamp.strftime('%H:%M'),
+                    'tempId': data.get('tempId') # ID used for optimistic update
                 }
             )
 
-            # Send notifications (Batch if possible, but group_send is already async)
+            # Send notifications concurrently to avoid loop latency
+            import asyncio
+            notification_tasks = []
             for username in members:
                 if username == self.scope['user'].username: continue
-                await self.channel_layer.group_send(
-                    f'user_notif_{username}',
-                    {
-                        'type': 'new_notification',
-                        'chat_id': str(self.chat_id),
-                        'chat_name': chat_display_name,
-                        'sender': self.scope['user'].username,
-                        'message': message_content,
-                        'message_type': message_type
-                    }
+                notification_tasks.append(
+                    self.channel_layer.group_send(
+                        f'user_notif_{username}',
+                        {
+                            'type': 'new_notification',
+                            'chat_id': str(self.chat_id),
+                            'chat_name': chat_display_name,
+                            'sender': self.scope['user'].username,
+                            'message': message_content,
+                            'message_type': message_type
+                        }
+                    )
                 )
+            if notification_tasks:
+                await asyncio.gather(*notification_tasks)
         
         elif action == 'typing':
             await self.channel_layer.group_send(
@@ -460,6 +468,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'reader': event['reader']
         }))
 
+    async def webrtc_signal(self, event):
+        # Forward WebRTC signal to the other peer(s)
+        # Exclude sender from receiving their own signal
+        sender_username = self.scope['user'].username if self.scope['user'].is_authenticated else "Anonymous"
+        if event['sender'] == sender_username:
+            return
+        await self.send(text_data=json.dumps(event['data']))
+
     async def group_update(self, event):
         await self.send(text_data=json.dumps(event))
 
@@ -478,11 +494,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
         user.save()
 
     @database_sync_to_async
-    def process_new_message(self, sender_id, chat_id, content, message_type='text', file_data=None, reply_to_id=None, unlock_at=None, is_view_once=False, is_protected=False):
+    def process_new_message(self, sender_id, chat_id, content, message_type='text', file_data=None, reply_to_id=None, unlock_at=None, is_view_once=False, is_protected=False, sender_username=None):
         from .models import Chat, Message, GroupRole
         from accounts.models import User
         
-        chat = Chat.objects.get(id=chat_id)
+        # Optimize: Fetch only necessary fields
+        chat = Chat.objects.select_related('created_by').prefetch_related('members').get(id=chat_id)
         
         # Check permission
         can_send = True
@@ -507,9 +524,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             is_view_once=is_view_once, is_protected=is_protected
         )
         
-        # Get members and display name
+        # Get members and display name efficiently
         members = [m.username for m in chat.members.all()]
-        chat_display_name = chat.name if (chat.is_group and chat.name) else sender.username
+        chat_display_name = chat.name if (chat.is_group and chat.name) else sender_username or sender.username
         
         return {
             'can_send': True,
@@ -908,6 +925,9 @@ class RoomConsumer(AsyncWebsocketConsumer):
             target_user_id = data.get('target_user_id')
             action_type = data.get('action_type') # admit or reject
             
+            # UPDATE DATABASE STATE
+            await self.update_admission_db(target_user_id, action_type == 'admit')
+            
             # Broadcast to everyone so they know user status updated
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -943,7 +963,8 @@ class RoomConsumer(AsyncWebsocketConsumer):
     def check_admission_status(self):
         from .models import Room, RoomParticipant
         try:
-            room = Room.objects.get(code=self.room_code)
+            # Use select_related to speed up
+            room = Room.objects.select_related('host').get(code=self.room_code)
             is_host = room.host == self.scope['user']
             if not room.require_admission:
                 return False, is_host
@@ -955,12 +976,22 @@ class RoomConsumer(AsyncWebsocketConsumer):
             # If guest and not admitted, they need admission
             if not is_host:
                 # Create participant record in waiting state if doesn't exist
-                RoomParticipant.objects.get_or_create(room=room, user=self.scope['user'])
+                if not participant:
+                    RoomParticipant.objects.create(room=room, user=self.scope['user'])
                 return True, False
             
             return False, True
         except Room.DoesNotExist:
             return True, False
+
+    @database_sync_to_async
+    def update_admission_db(self, user_id, status):
+        from .models import Room, RoomParticipant
+        try:
+            room = Room.objects.get(code=self.room_code)
+            RoomParticipant.objects.filter(room=room, user_id=user_id).update(is_admitted=status)
+        except Exception as e:
+            print(f"Error updating admission: {e}")
 
     @database_sync_to_async
     def get_username_by_id(self, user_id):
